@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedback — Readium Beta</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 18px; line-height: 1.5; margin: 0; padding: 16px; background: #fdf6e3; color: #222; }
+  .wrap { max-width: 600px; margin: 0 auto; }
+  h1 { font-size: 28px; text-align: center; }
+  h2 { font-size: 22px; }
+  p { margin: 12px 0; }
+  .hidden { display: none; }
+  input, select, textarea { font-size: 18px; padding: 8px; width: 100%; box-sizing: border-box; margin: 4px 0 10px; }
+  textarea { min-height: 120px; }
+  button { font-size: 18px; padding: 10px 18px; background: #222; color: #fff; border: none; cursor: pointer; margin: 4px 4px 4px 0; }
+  button.secondary { background: #fff; color: #222; border: 2px solid #222; }
+  a { color: #222; }
+  .note { font-size: 15px; color: #555; }
+  .center { text-align: center; }
+  #fb-msg { font-size: 15px; min-height: 20px; }
+  .fb-item { border: 2px solid #222; background: #fff; padding: 10px 14px; margin: 10px 0; }
+  .fb-item .meta { font-size: 15px; color: #555; margin: 0 0 4px; }
+  .fb-item .text { margin: 4px 0 0; white-space: pre-wrap; word-wrap: break-word; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Leave feedback</h1>
+  <p class="center"><a href="index.html">back to beta home</a></p>
+  <p class="note" id="fb-who">You can leave feedback without an account — just type your name.</p>
+
+  <label for="fb-feature">feature</label>
+  <select id="fb-feature"></select>
+  <label for="fb-name">your name</label>
+  <input id="fb-name" type="text" maxlength="30" placeholder="your Readium name">
+  <label for="fb-text">feedback</label>
+  <textarea id="fb-text" maxlength="2000" placeholder="what worked, what broke, what should change?"></textarea>
+  <button id="fb-submit">send feedback</button>
+  <p id="fb-msg"></p>
+
+  <p class="center note"><a href="#" id="fb-show-signin">sign in with your Readium account instead</a></p>
+  <div id="fb-signin" class="hidden">
+    <h2>sign in</h2>
+    <label for="fb-email">email</label>
+    <input id="fb-email" type="email" autocomplete="email">
+    <label for="fb-pass">password</label>
+    <input id="fb-pass" type="password" autocomplete="current-password">
+    <button id="fb-signin-btn">sign in</button>
+    <p id="fb-signin-msg" class="note"></p>
+  </div>
+
+  <div id="fb-list-wrap" class="hidden">
+    <h2>feedback so far</h2>
+    <p class="note">Only the founders can see this list.</p>
+    <div id="fb-list"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+var firebaseConfig = {
+    apiKey: "AIzaSyBM8k1SltnksCRZ5NvgggfQ952H3DZIyDY",
+    authDomain: "readium-33755.firebaseapp.com",
+    databaseURL: "https://readium-33755-default-rtdb.firebaseio.com",
+    projectId: "readium-33755",
+    storageBucket: "readium-33755.firebasestorage.app",
+    messagingSenderId: "1062133935488",
+    appId: "1:1062133935488:web:a00716635022a998f32565"
+  };
+firebase.initializeApp(firebaseConfig);
+var auth = firebase.auth();
+var db = firebase.database();
+
+// Same feature list as index.html — keep the two in sync when adding a feature.
+var BETA_FEATURES = [
+  { id: "pets", name: "Pets", desc: "Raise a pet: feed it, play with it, level it up.", page: "pet-test.html" }
+];
+var FOUNDERS = ["393cJa8SHXbuHTX4CTBf2yS4ePi1", "m9vGjZaNSVe1ofNotoUhuEx32BY2"];
+var fbListRef = null;
+
+(function buildFeatureSelect() {
+  var sel = document.getElementById("fb-feature");
+  for (var i = 0; i < BETA_FEATURES.length; i++) {
+    var o = document.createElement("option");
+    o.value = BETA_FEATURES[i].id;
+    o.textContent = BETA_FEATURES[i].name;
+    sel.appendChild(o);
+  }
+})();
+
+function esc(s) { return String(s == null ? "" : s); }
+
+document.getElementById("fb-submit").onclick = function () {
+  var msg = document.getElementById("fb-msg");
+  msg.textContent = "";
+  var feature = document.getElementById("fb-feature").value;
+  var name = document.getElementById("fb-name").value.trim();
+  var text = document.getElementById("fb-text").value.trim();
+  if (!feature) { msg.textContent = "pick a feature first."; return; }
+  if (name.length < 1 || name.length > 30) { msg.textContent = "enter your name (1-30 letters)."; return; }
+  if (text.length < 1 || text.length > 2000) { msg.textContent = "write a little feedback first (up to 2000 letters)."; return; }
+  var user = auth.currentUser;
+  var entry = {
+    feature: feature,
+    name: name,
+    text: text,
+    at: firebase.database.ServerValue.TIMESTAMP
+  };
+  if (user) { entry.uid = user.uid; }
+  db.ref("betaFeedback").push(entry, function (err) {
+    if (err) {
+      msg.textContent = "could not send that — try again. (" + (err.message || err) + ")";
+      return;
+    }
+    msg.textContent = "thanks! your feedback was sent.";
+    document.getElementById("fb-text").value = "";
+  });
+};
+
+document.getElementById("fb-show-signin").onclick = function (e) {
+  e.preventDefault();
+  document.getElementById("fb-signin").className = "";
+};
+document.getElementById("fb-signin-btn").onclick = function () {
+  var em = document.getElementById("fb-email").value.trim();
+  var pw = document.getElementById("fb-pass").value;
+  var msg = document.getElementById("fb-signin-msg");
+  msg.textContent = "";
+  if (!em || !pw) { msg.textContent = "enter your email and password."; return; }
+  auth.signInWithEmailAndPassword(em, pw).catch(function (err) {
+    msg.textContent = "could not sign in: " + (err && err.message ? err.message : "check your email and password.");
+  });
+};
+
+function showFounderList() {
+  var wrap = document.getElementById("fb-list-wrap");
+  wrap.className = "";
+  if (fbListRef) { fbListRef.off(); }
+  fbListRef = db.ref("betaFeedback").orderByChild("at").limitToLast(100);
+  fbListRef.on("value", function (snap) {
+    var list = document.getElementById("fb-list");
+    list.innerHTML = "";
+    var val = snap.val() || {};
+    var keys = Object.keys(val);
+    if (!keys.length) {
+      list.textContent = "No feedback yet.";
+      return;
+    }
+    keys.sort(function (a, b) { return (val[b].at || 0) - (val[a].at || 0); });
+    for (var i = 0; i < keys.length; i++) {
+      (function (e) {
+        var d = document.createElement("div");
+        d.className = "fb-item";
+        var meta = document.createElement("p");
+        meta.className = "meta";
+        var when = e.at ? new Date(e.at).toLocaleString() : "";
+        var fname = e.feature || "";
+        for (var j = 0; j < BETA_FEATURES.length; j++) {
+          if (BETA_FEATURES[j].id === e.feature) { fname = BETA_FEATURES[j].name; }
+        }
+        meta.textContent = fname + " — " + (e.name || "anon") + (when ? " — " + when : "");
+        d.appendChild(meta);
+        var t = document.createElement("p");
+        t.className = "text";
+        t.textContent = e.text || "";
+        d.appendChild(t);
+        list.appendChild(d);
+      })(val[keys[i]]);
+    }
+  });
+}
+
+auth.onAuthStateChanged(function (user) {
+  var who = document.getElementById("fb-who");
+  if (!user) {
+    // No account needed to leave feedback — sign in as a guest so the
+    // write is authenticated. Falls back to the sign-in form if it fails.
+    auth.signInAnonymously().catch(function () {
+      who.textContent = "Guest sign-in did not work — sign in with your Readium account below to leave feedback.";
+      document.getElementById("fb-signin").className = "";
+    });
+    return;
+  }
+  if (user.isAnonymous) {
+    who.textContent = "You are signed in as a guest — just type your name below.";
+    return;
+  }
+  who.textContent = "Signed in as " + (user.email || "your Readium account") + ".";
+  document.getElementById("fb-signin").className = "hidden";
+  // Prefill the name from the Readium profile when we can.
+  db.ref("users/" + user.uid + "/name").once("value", function (snap) {
+    var nm = snap.val();
+    if (typeof nm === "string" && nm) {
+      document.getElementById("fb-name").value = nm;
+    }
+  });
+  if (FOUNDERS.indexOf(user.uid) !== -1) { showFounderList(); }
+});
+</script>
+</body>
+</html>
