@@ -478,6 +478,15 @@ function craftDecToy(key) {
   if (!decLive()) { decMsg("the december event isn't running right now."); renderDecWorkshop(); return; }
   if (!decHasParts(toy)) { decMsg("not enough parts — you need " + decRecipeText(toy) + "."); renderDecWorkshop(); return; }
   decBusy = true;
+  // show it right away: parts drop and the toy appears in your sleigh the
+  // instant you tap, then the server confirms it. if it fails we roll back.
+  for (var p0 in toy.recipe) {
+    if (toy.recipe.hasOwnProperty(p0)) { myDecParts[p0] = (myDecParts[p0] || 0) - toy.recipe[p0]; }
+  }
+  myDecToys[key] = (myDecToys[key] || 0) + 1;
+  renderDecPartsLine();
+  renderDecWorkshop();
+  renderDecDelivery();
   decMsg("crafting a " + toy.name + "...");
   // atomic increments: parts go down and the toy goes up on the server,
   // so rapid taps can never overwrite each other and lose parts or toys
@@ -488,11 +497,17 @@ function craftDecToy(key) {
   up["toys/" + key] = firebase.database.ServerValue.increment(1);
   db.ref("decStations/" + uid).update(up, function (err) {
     decBusy = false;
-    if (err) { decMsg("couldn't craft that — try again."); renderDecWorkshop(); return; }
-    for (var p2 in toy.recipe) {
-      if (toy.recipe.hasOwnProperty(p2)) { myDecParts[p2] = (myDecParts[p2] || 0) - toy.recipe[p2]; }
+    if (err) {
+      for (var p3 in toy.recipe) {
+        if (toy.recipe.hasOwnProperty(p3)) { myDecParts[p3] = (myDecParts[p3] || 0) + toy.recipe[p3]; }
+      }
+      myDecToys[key] = Math.max(0, (myDecToys[key] || 0) - 1);
+      decMsg("couldn't craft that — try again.");
+      renderDecPartsLine();
+      renderDecWorkshop();
+      renderDecDelivery();
+      return;
     }
-    myDecToys[key] = (myDecToys[key] || 0) + 1;
     decMsg("you crafted a " + toy.name + "! it's in your sleigh — go deliver it!");
     renderDecPartsLine();
     renderDecWorkshop();
@@ -520,20 +535,41 @@ function buyDecPart(part) {
   if (decBusy) { renderDecPartsShop(); return; }
   if (!myDecTeam) { decMsg("join a team first — tap 'sort me onto a team!'"); renderDecPartsShop(); return; }
   if (!decLive()) { decMsg("the december event isn't running right now."); renderDecPartsShop(); return; }
+  if ((myDecCanes || 0) < 50) { decMsg("not enough candy canes! you have " + (myDecCanes || 0) + "."); renderDecPartsShop(); return; }
   decBusy = true;
+  // show it right away: the part count and candy canes update the instant
+  // you tap, then the server confirms it. if the buy fails we roll back.
+  myDecParts[part] = (myDecParts[part] || 0) + 1;
+  myDecCanes = (myDecCanes || 0) - 50;
+  var clTop = document.getElementById("dec-candy-line");
+  if (clTop) { clTop.textContent = myDecCanes; }
+  renderDecPartsLine();
+  renderDecWorkshop();
   decMsg("buying 1 " + part + "...");
   db.ref("decCandy/" + uid).transaction(function (c) {
     if ((c || 0) < 50) { return; }
     return c - 50;
   }, function (err, committed, snap) {
-    if (err) { decBusy = false; decMsg("couldn't buy that part — try again."); renderDecPartsShop(); return; }
+    if (err) {
+      decBusy = false;
+      myDecParts[part] = Math.max(0, (myDecParts[part] || 0) - 1);
+      myDecCanes = (myDecCanes || 0) + 50;
+      var clE = document.getElementById("dec-candy-line");
+      if (clE) { clE.textContent = myDecCanes; }
+      decMsg("couldn't buy that part — try again.");
+      renderDecPartsLine();
+      renderDecWorkshop();
+      return;
+    }
     if (!committed) {
       decBusy = false;
       var have = (snap && typeof snap.val() === "number") ? snap.val() : 0;
+      myDecParts[part] = Math.max(0, (myDecParts[part] || 0) - 1);
       myDecCanes = have;
       var cl0 = document.getElementById("dec-candy-line");
       if (cl0) { cl0.textContent = myDecCanes; }
-      renderDecPartsShop();
+      renderDecPartsLine();
+      renderDecWorkshop();
       decMsg("not enough candy canes! you have " + have + ".");
       return;
     }
@@ -549,17 +585,20 @@ function buyDecPart(part) {
             myDecCanes = (typeof s.val() === "number") ? s.val() : myDecCanes;
             var cl2 = document.getElementById("dec-candy-line");
             if (cl2) { cl2.textContent = myDecCanes; }
-            renderDecPartsShop();
+            renderDecPartsLine();
+            renderDecWorkshop();
           });
         });
         decBusy = false;
+        myDecParts[part] = Math.max(0, (myDecParts[part] || 0) - 1);
         decMsg("couldn't save the part — your 50 candy canes were refunded. try again.");
-        renderDecPartsShop();
+        renderDecPartsLine();
+        renderDecWorkshop();
         return;
       }
       decBusy = false;
-      myDecParts[part] = (myDecParts[part] || 0) + 1;
-      myDecCanes = (snap && typeof snap.val() === "number") ? snap.val() : (myDecCanes - 50);
+      // part was already counted above — just sync the money to the server value
+      myDecCanes = (snap && typeof snap.val() === "number") ? snap.val() : myDecCanes;
       var cl = document.getElementById("dec-candy-line");
       if (cl) { cl.textContent = myDecCanes; }
       decMsg("bought 1 " + part + " for 50 candy canes!");
@@ -625,6 +664,17 @@ function deliverDecToy(idx) {
   }
   decBusy = true;
   var newToy = decRandomToyKey();
+  // show it right away: the toy leaves your sleigh, the house wants a new
+  // toy and the candy canes go up the instant you tap. if it fails we roll back.
+  myDecToys[wantKey] = (myDecToys[wantKey] || 0) - 1;
+  myDecDelivered = (myDecDelivered || 0) + 1;
+  myDecHouses[idx] = newToy;
+  myDecCanes = (myDecCanes || 0) + want.deliver;
+  var clD = document.getElementById("dec-candy-line");
+  if (clD) { clD.textContent = myDecCanes; }
+  renderDecPartsLine();
+  renderDecWorkshop();
+  renderDecDelivery();
   // atomic increments: the toy goes down and delivered goes up on the
   // server, so rapid taps can never overwrite each other and lose a toy
   var up = {};
@@ -633,10 +683,19 @@ function deliverDecToy(idx) {
   up["house" + idx] = newToy;
   db.ref("decStations/" + uid).update(up, function (err) {
     decBusy = false;
-    if (err) { decMsg("couldn't deliver that — try again."); renderDecDelivery(); return; }
-    myDecToys[wantKey] = (myDecToys[wantKey] || 0) - 1;
-    myDecDelivered = (myDecDelivered || 0) + 1;
-    myDecHouses[idx] = newToy;
+    if (err) {
+      myDecToys[wantKey] = (myDecToys[wantKey] || 0) + 1;
+      myDecDelivered = Math.max(0, (myDecDelivered || 0) - 1);
+      myDecHouses[idx] = wantKey;
+      myDecCanes = (myDecCanes || 0) - want.deliver;
+      var clE = document.getElementById("dec-candy-line");
+      if (clE) { clE.textContent = myDecCanes; }
+      decMsg("couldn't deliver that — try again.");
+      renderDecPartsLine();
+      renderDecWorkshop();
+      renderDecDelivery();
+      return;
+    }
     decAddCanes(want.deliver);
     var m = "delivered a " + want.name + " to house " + (idx + 1) + "! +" + want.deliver + " candy canes!";
     decMsg(m);
