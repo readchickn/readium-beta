@@ -43,8 +43,8 @@
   <p class="center note"><a href="#" id="fb-show-signin">sign in with your Readium account instead</a></p>
   <div id="fb-signin" class="hidden">
     <h2>sign in</h2>
-    <label for="fb-email">email</label>
-    <input id="fb-email" type="email" autocomplete="email">
+    <label for="fb-username">Username</label>
+    <input id="fb-username" type="text" maxlength="20" autocomplete="username" placeholder="your username">
     <label for="fb-pass">password</label>
     <input id="fb-pass" type="password" autocomplete="current-password">
     <button id="fb-signin-btn">sign in</button>
@@ -125,14 +125,34 @@ document.getElementById("fb-show-signin").onclick = function (e) {
   e.preventDefault();
   document.getElementById("fb-signin").className = "";
 };
+/* Same sign-in as the real site: username + password. The account email
+   is just username@readium.chat under the hood — there is no real email. */
+function loginEmail(username) { return username + "@readium.chat"; }
+function validUsername(u) { return /^[a-z0-9._-]{3,20}$/.test(u); }
+function friendlyAuthError(err) {
+  var code = err && err.code ? err.code : "";
+  if (code === "auth/user-not-found" || code === "auth/invalid-credential") {
+    return "No account with that username. Try creating one on readium.ink instead.";
+  }
+  if (code === "auth/wrong-password") { return "Wrong password. Try again."; }
+  if (code === "auth/too-many-requests") { return "Too many tries. Wait a bit and try again."; }
+  return "Something went wrong: " + (err.message || code);
+}
+function usernameFromUser(user) {
+  if (!user) { return "your Readium account"; }
+  if (user.displayName) { return user.displayName; }
+  if (user.email) { return user.email.split("@")[0]; }
+  return "your Readium account";
+}
 document.getElementById("fb-signin-btn").onclick = function () {
-  var em = document.getElementById("fb-email").value.trim();
+  var un = document.getElementById("fb-username").value.replace(/^\s+|\s+$/g, "").toLowerCase();
   var pw = document.getElementById("fb-pass").value;
   var msg = document.getElementById("fb-signin-msg");
   msg.textContent = "";
-  if (!em || !pw) { msg.textContent = "enter your email and password."; return; }
-  auth.signInWithEmailAndPassword(em, pw).catch(function (err) {
-    msg.textContent = "could not sign in: " + (err && err.message ? err.message : "check your email and password.");
+  if (!validUsername(un)) { msg.textContent = "enter your username (3-20 characters)."; return; }
+  if (!pw) { msg.textContent = "enter your password."; return; }
+  auth.signInWithEmailAndPassword(loginEmail(un), pw).catch(function (err) {
+    msg.textContent = friendlyAuthError(err);
   });
 };
 
@@ -189,7 +209,7 @@ auth.onAuthStateChanged(function (user) {
     who.textContent = "You are signed in as a guest — just type your name below.";
     return;
   }
-  who.textContent = "Signed in as " + (user.email || "your Readium account") + ".";
+  who.textContent = "Signed in as " + usernameFromUser(user) + ".";
   document.getElementById("fb-signin").className = "hidden";
   // Prefill the name from the Readium profile when we can.
   db.ref("users/" + user.uid + "/name").once("value", function (snap) {
