@@ -5,27 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Beta: Pets — Readium</title>
 <style>
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 18px; line-height: 1.5; margin: 0; padding: 16px; background: #fdf6e3; color: #222; }
-  .wrap { max-width: 600px; margin: 0 auto; }
-  h1 { font-size: 28px; text-align: center; }
-  h2 { font-size: 22px; }
-  p { margin: 12px 0; }
+  body { font-family: Georgia, "Times New Roman", serif; background: #ffffff; color: #111111; max-width: 620px; margin: 0 auto; padding: 16px 12px; font-size: 17px; line-height: 1.45; }
+  .wrap { max-width: 620px; margin: 0 auto; }
+  h1 { font-size: 28px; text-align: center; margin: 0 0 8px 0; }
+  h2 { font-size: 22px; margin: 20px 0 8px 0; }
+  p { margin: 0 0 16px 0; }
   .hidden { display: none; }
-  input { font-size: 18px; padding: 8px; width: 100%; box-sizing: border-box; margin: 4px 0 10px; }
-  button { font-size: 18px; padding: 10px 18px; background: #222; color: #fff; border: none; cursor: pointer; margin: 4px 4px 4px 0; }
-  button:disabled { background: #999; cursor: default; }
-  button.secondary { background: #fff; color: #222; border: 2px solid #222; }
-  a { color: #222; }
-  .note { font-size: 15px; color: #555; }
+  label { display: block; margin: 12px 0 4px 0; font-weight: bold; }
+  input { font-family: inherit; font-size: 15px; padding: 10px 10px; border: 3px solid #111111; width: 100%; box-sizing: border-box; margin: 4px 0 10px; }
+  button { font-family: inherit; font-size: 18px; padding: 10px 16px; background: #111111; color: #ffffff; border: 3px solid #111111; cursor: pointer; width: 100%; box-sizing: border-box; margin: 6px 0; }
+  button:disabled { background: #999999; border-color: #999999; cursor: default; }
+  button.secondary { background: #ffffff; color: #111111; }
+  button.mini { width: auto; font-size: 14px; padding: 5px 10px; margin: 6px 6px 0 0; border-width: 2px; }
+  a { color: #111111; }
+  .note { font-size: 15px; color: #555555; }
   .center { text-align: center; }
   #pet-img { width: 96px; height: 96px; image-rendering: pixelated; }
-  .bar-outer { border: 2px solid #000; max-width: 280px; height: 16px; margin: 0 auto; }
+  .bar-outer { border: 3px solid #111111; max-width: 280px; height: 16px; margin: 0 auto; }
   .bar-inner { height: 100%; width: 100%; }
-  #pet-hunger-bar { background: #7ec850; }
-  #pet-happy-bar { background: #f2b8c6; }
-  #pet-picker { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-  .pet-pick { border: 2px solid #222; background: #fff; padding: 8px; text-align: center; cursor: pointer; width: 96px; }
-  .pet-pick.sel { background: #ffe9a8; }
+  #pet-hunger-bar { background: #111111; }
+  #pet-happy-bar { background: #555555; }
+  #pet-picker { text-align: center; }
+  .pet-pick { display: inline-block; border: 3px solid #111111; background: #ffffff; padding: 8px; text-align: center; cursor: pointer; width: 96px; margin: 4px; vertical-align: top; }
+  .pet-pick.sel { background: #eeeeee; }
   .pet-pick img { width: 64px; height: 64px; image-rendering: pixelated; }
   .pet-pick span { display: block; font-size: 13px; }
   #auth-msg, #pet-msg { font-size: 15px; min-height: 20px; }
@@ -39,7 +41,7 @@
 
   <div id="auth-box">
     <h2>sign in to test pets</h2>
-    <p>You need a Readium account to test pets.</p>
+    <p>Use your Readium account — the same email and password you use on readium.ink. It has to be your account because this tests your real pet and XP.</p>
     <label for="signin-email">email</label>
     <input id="signin-email" type="email" autocomplete="email">
     <label for="signin-pass">password</label>
@@ -49,7 +51,7 @@
   </div>
 
   <div id="pet-box" class="hidden">
-    <p>signed in as <b><span id="pet-user"></span></b> <button id="pet-signout" class="secondary">sign out</button></p>
+    <p>signed in as <b><span id="pet-user"></span></b> <button id="pet-signout" class="secondary mini">sign out</button></p>
     <p>your xp: <b><span id="pet-xp">0</span></b></p>
     <div id="pet-main" class="hidden">
       <div class="center">
