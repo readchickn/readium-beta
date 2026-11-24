@@ -47,6 +47,9 @@
   .dec-row img { width: 32px; height: 32px; image-rendering: pixelated; vertical-align: middle; margin-right: 6px; }
   .dec-row.me { background: #eeeeee; }
   .team-logo { width: 56px; height: 56px; image-rendering: pixelated; vertical-align: middle; margin: 2px; }
+  .dec-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 50; box-sizing: border-box; padding: 12px; overflow-y: auto; }
+  .dec-modal.open { display: block; }
+  .dec-modal-box { background: #ffffff; border: 3px solid #111111; max-width: 620px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
 </style>
 </head>
 <body>
@@ -102,12 +105,11 @@
     </div>
 
     <div id="dec-main" class="hidden">
-      <h2>santa's workshop — craft toys</h2>
-      <p id="dec-workshop-note">earn parts from advent doors, the wheel and gifts. craft a toy at its station, then deliver it by sleigh! nothing here makes itself — you build every toy.</p>
-      <div id="dec-workshop"></div>
-      <h2>parts shop</h2>
-      <p>short a part? buy one for 50 candy canes.</p>
-      <div id="dec-partshop"></div>
+      <p>
+        <button id="dec-open-workshop">workshop — craft toys</button>
+        <button id="dec-open-advent">advent calendar</button>
+        <button id="dec-open-wheel">spin the wheel!</button>
+      </p>
       <p id="dec-result"></p>
 
       <h2>sleigh delivery</h2>
@@ -115,22 +117,6 @@
       <p id="dec-delivered-line"></p>
       <div id="dec-houses"></div>
       <p id="dec-deliver-msg"></p>
-
-      <h2>advent calendar</h2>
-      <p id="dec-advent-note"></p>
-      <div id="dec-advent"></div>
-      <p id="dec-advent-msg"></p>
-
-      <div id="dec-wheel-box">
-        <h2>spin the wheel!</h2>
-        <p id="dec-wheel-streak">your streak: 0 days — spin today to start one!</p>
-        <div id="dec-wheel-wrap">
-          <div id="dec-wheel"></div>
-          <div id="dec-wheel-pointer">&#9660;</div>
-        </div>
-        <button id="dec-spin-btn">spin the wheel!</button>
-        <p id="dec-wheel-msg"></p>
-      </div>
 
       <div id="dec-gift-box">
         <button id="dec-gift-btn">claim today's gift (+100)</button>
@@ -144,6 +130,44 @@
       </p>
       <div id="dec-board-list"></div>
       <p class="center"><a class="btn" href="feedback.html" style="display:block; box-sizing:border-box; font-size:18px; padding:10px 16px; background:#111111; color:#ffffff; text-decoration:none; text-align:center; border:3px solid #111111; margin:6px 0;">leave feedback on the december event</a></p>
+    </div>
+  </div>
+</div>
+
+<div id="dec-modal-workshop" class="dec-modal">
+  <div class="dec-modal-box">
+    <button id="dec-close-workshop" class="secondary">← back</button>
+    <h2>santa's workshop — craft toys</h2>
+    <p>earn parts from advent doors, the wheel and gifts. craft a toy at its station, then deliver it by sleigh! nothing here makes itself — you build every toy.</p>
+    <div id="dec-workshop"></div>
+    <h2>parts shop</h2>
+    <p>short a part? buy one for 50 candy canes.</p>
+    <div id="dec-partshop"></div>
+  </div>
+</div>
+
+<div id="dec-modal-advent" class="dec-modal">
+  <div class="dec-modal-box">
+    <button id="dec-close-advent" class="secondary">← back</button>
+    <h2>advent calendar</h2>
+    <p id="dec-advent-note"></p>
+    <div id="dec-advent"></div>
+    <p id="dec-advent-msg"></p>
+  </div>
+</div>
+
+<div id="dec-modal-wheel" class="dec-modal">
+  <div class="dec-modal-box">
+    <button id="dec-close-wheel" class="secondary">← back</button>
+    <div id="dec-wheel-box">
+      <h2>spin the wheel!</h2>
+      <p id="dec-wheel-streak">your streak: 0 days — spin today to start one!</p>
+      <div id="dec-wheel-wrap">
+        <div id="dec-wheel"></div>
+        <div id="dec-wheel-pointer">&#9660;</div>
+      </div>
+      <button id="dec-spin-btn">spin the wheel!</button>
+      <p id="dec-wheel-msg"></p>
     </div>
   </div>
 </div>
@@ -204,6 +228,7 @@ var decWheelRot = 0;
 var decSpinning = false;
 var decTab = "teams";
 var decDoorEls = {};
+var decBusy = false;
 
 function myUid() { return auth.currentUser ? auth.currentUser.uid : null; }
 function decMsg(t) { var r = document.getElementById("dec-result"); if (r) { r.textContent = t; } }
@@ -437,7 +462,7 @@ function renderDecWorkshop() {
       var btn = document.createElement("button");
       btn.textContent = decHasParts(toy) ? "craft a " + toy.name + "!" : "need " + decRecipeText(toy);
       btn.disabled = !decHasParts(toy);
-      btn.onclick = function () { craftDecToy(toy.key); };
+      btn.onclick = function () { btn.disabled = true; craftDecToy(toy.key); };
       card.appendChild(stIm); card.appendChild(toyIm); card.appendChild(h); card.appendChild(ap);
       card.appendChild(rp); card.appendChild(hp); card.appendChild(dp); card.appendChild(btn);
       box.appendChild(card);
@@ -447,18 +472,23 @@ function renderDecWorkshop() {
 function craftDecToy(key) {
   var toy = decToyByKey(key);
   var uid = myUid();
-  if (!toy || !uid) { decMsg("hmm, that didn't work — try leaving the event screen and coming back."); return; }
-  if (!myDecTeam) { decMsg("join a team first — tap 'sort me onto a team!'"); return; }
-  if (!decLive()) { decMsg("the december event isn't running right now."); return; }
+  if (!toy || !uid) { decMsg("hmm, that didn't work — try leaving the event screen and coming back."); renderDecWorkshop(); return; }
+  if (decBusy) { renderDecWorkshop(); return; }
+  if (!myDecTeam) { decMsg("join a team first — tap 'sort me onto a team!'"); renderDecWorkshop(); return; }
+  if (!decLive()) { decMsg("the december event isn't running right now."); renderDecWorkshop(); return; }
   if (!decHasParts(toy)) { decMsg("not enough parts — you need " + decRecipeText(toy) + "."); renderDecWorkshop(); return; }
+  decBusy = true;
   decMsg("crafting a " + toy.name + "...");
+  // atomic increments: parts go down and the toy goes up on the server,
+  // so rapid taps can never overwrite each other and lose parts or toys
   var up = {};
   for (var p in toy.recipe) {
-    if (toy.recipe.hasOwnProperty(p)) { up["parts/" + p] = (myDecParts[p] || 0) - toy.recipe[p]; }
+    if (toy.recipe.hasOwnProperty(p)) { up["parts/" + p] = firebase.database.ServerValue.increment(-toy.recipe[p]); }
   }
-  up["toys/" + key] = (myDecToys[key] || 0) + 1;
+  up["toys/" + key] = firebase.database.ServerValue.increment(1);
   db.ref("decStations/" + uid).update(up, function (err) {
-    if (err) { decMsg("couldn't craft that — try again."); return; }
+    decBusy = false;
+    if (err) { decMsg("couldn't craft that — try again."); renderDecWorkshop(); return; }
     for (var p2 in toy.recipe) {
       if (toy.recipe.hasOwnProperty(p2)) { myDecParts[p2] = (myDecParts[p2] || 0) - toy.recipe[p2]; }
     }
@@ -479,23 +509,26 @@ function renderDecPartsShop() {
       btn.className = "mini";
       btn.textContent = "buy 1 " + part + " — 50 candy canes";
       btn.disabled = (myDecCanes < 50);
-      btn.onclick = function () { buyDecPart(part); };
+      btn.onclick = function () { btn.disabled = true; buyDecPart(part); };
       box.appendChild(btn);
     })(DEC_PARTS[i]);
   }
 }
 function buyDecPart(part) {
   var uid = myUid();
-  if (!uid) { return; }
-  if (!myDecTeam) { decMsg("join a team first — tap 'sort me onto a team!'"); return; }
-  if (!decLive()) { decMsg("the december event isn't running right now."); return; }
+  if (!uid) { renderDecPartsShop(); return; }
+  if (decBusy) { renderDecPartsShop(); return; }
+  if (!myDecTeam) { decMsg("join a team first — tap 'sort me onto a team!'"); renderDecPartsShop(); return; }
+  if (!decLive()) { decMsg("the december event isn't running right now."); renderDecPartsShop(); return; }
+  decBusy = true;
   decMsg("buying 1 " + part + "...");
   db.ref("decCandy/" + uid).transaction(function (c) {
     if ((c || 0) < 50) { return; }
     return c - 50;
   }, function (err, committed, snap) {
-    if (err) { decMsg("couldn't buy that part — try again."); return; }
+    if (err) { decBusy = false; decMsg("couldn't buy that part — try again."); renderDecPartsShop(); return; }
     if (!committed) {
+      decBusy = false;
       var have = (snap && typeof snap.val() === "number") ? snap.val() : 0;
       myDecCanes = have;
       var cl0 = document.getElementById("dec-candy-line");
@@ -504,10 +537,27 @@ function buyDecPart(part) {
       decMsg("not enough candy canes! you have " + have + ".");
       return;
     }
+    // atomic increment: adds 1 on the server no matter how fast you tap,
+    // so rapid taps can never overwrite each other and lose a part
     var up = {};
-    up["parts/" + part] = (myDecParts[part] || 0) + 1;
+    up["parts/" + part] = firebase.database.ServerValue.increment(1);
     db.ref("decStations/" + uid).update(up, function (uerr) {
-      if (uerr) { decMsg("couldn't save the part — try again."); return; }
+      if (uerr) {
+        // money was already taken — refund it so a failed save never eats candy canes
+        db.ref("decCandy/" + uid).transaction(function (c) { return (c || 0) + 50; }, function () {
+          db.ref("decCandy/" + uid).once("value", function (s) {
+            myDecCanes = (typeof s.val() === "number") ? s.val() : myDecCanes;
+            var cl2 = document.getElementById("dec-candy-line");
+            if (cl2) { cl2.textContent = myDecCanes; }
+            renderDecPartsShop();
+          });
+        });
+        decBusy = false;
+        decMsg("couldn't save the part — your 50 candy canes were refunded. try again.");
+        renderDecPartsShop();
+        return;
+      }
+      decBusy = false;
       myDecParts[part] = (myDecParts[part] || 0) + 1;
       myDecCanes = (snap && typeof snap.val() === "number") ? snap.val() : (myDecCanes - 50);
       var cl = document.getElementById("dec-candy-line");
@@ -545,7 +595,7 @@ function renderDecDelivery() {
         var btn = document.createElement("button");
         btn.textContent = have > 0 ? "deliver a " + want.name + "!" : "you need a " + want.name;
         btn.disabled = have <= 0;
-        btn.onclick = function () { deliverDecToy(idx); };
+        btn.onclick = function () { btn.disabled = true; deliverDecToy(idx); };
         card.appendChild(btn);
       } else {
         var p2 = document.createElement("p");
@@ -560,25 +610,30 @@ function renderDecDelivery() {
 }
 function deliverDecToy(idx) {
   var uid = myUid();
-  if (!uid) { return; }
-  if (!myDecTeam) { decMsg("join a team first — tap 'sort me onto a team!'"); return; }
-  if (!decLive()) { decMsg("the december event isn't running right now."); return; }
+  if (!uid) { renderDecDelivery(); return; }
+  if (decBusy) { renderDecDelivery(); return; }
+  if (!myDecTeam) { decMsg("join a team first — tap 'sort me onto a team!'"); renderDecDelivery(); return; }
+  if (!decLive()) { decMsg("the december event isn't running right now."); renderDecDelivery(); return; }
   var houses = myDecHouses || [];
   var wantKey = houses[idx];
   var want = decToyByKey(wantKey);
-  if (!want) { return; }
+  if (!want) { renderDecDelivery(); return; }
   if ((myDecToys[wantKey] || 0) <= 0) {
     decMsg("you need a " + want.name + " — craft one in the workshop!");
     renderDecDelivery();
     return;
   }
+  decBusy = true;
   var newToy = decRandomToyKey();
+  // atomic increments: the toy goes down and delivered goes up on the
+  // server, so rapid taps can never overwrite each other and lose a toy
   var up = {};
-  up["toys/" + wantKey] = (myDecToys[wantKey] || 0) - 1;
-  up["delivered"] = (myDecDelivered || 0) + 1;
+  up["toys/" + wantKey] = firebase.database.ServerValue.increment(-1);
+  up["delivered"] = firebase.database.ServerValue.increment(1);
   up["house" + idx] = newToy;
   db.ref("decStations/" + uid).update(up, function (err) {
-    if (err) { decMsg("couldn't deliver that — try again."); return; }
+    decBusy = false;
+    if (err) { decMsg("couldn't deliver that — try again."); renderDecDelivery(); return; }
     myDecToys[wantKey] = (myDecToys[wantKey] || 0) - 1;
     myDecDelivered = (myDecDelivered || 0) + 1;
     myDecHouses[idx] = newToy;
@@ -651,6 +706,8 @@ function decClaimDoor(n) {
   if (!uid || !myDecTeam) { return; }
   if (!decDoorOpen(n) || decDoorClaimed(n)) { return; }
   if (!decLive()) { decMsg("the december event isn't running right now."); return; }
+  if (decBusy) { return; }
+  decBusy = true;
   var r = decAdventReward(n);
   var gotParts = [];
   for (var i = 0; i < r.parts; i++) { gotParts.push(decRandomPart()); }
@@ -658,11 +715,14 @@ function decClaimDoor(n) {
   for (var k = 0; k < gotParts.length; k++) { counts[gotParts[k]] = (counts[gotParts[k]] || 0) + 1; }
   var up = {};
   up["advent" + n] = decDayStr(new Date());
+  // atomic increments: parts add up on the server no matter how fast
+  // doors are opened, so rapid taps can never overwrite and lose parts
   for (var cp in counts) {
-    if (counts.hasOwnProperty(cp)) { up["parts/" + cp] = (myDecParts[cp] || 0) + counts[cp]; }
+    if (counts.hasOwnProperty(cp)) { up["parts/" + cp] = firebase.database.ServerValue.increment(counts[cp]); }
   }
   db.ref("decStations/" + uid).update(up, function (err) {
-    if (err) { decMsg("couldn't open that door — try again."); return; }
+    decBusy = false;
+    if (err) { decMsg("couldn't open that door — try again."); renderDecAdvent(); return; }
     myDecStations = myDecStations || {};
     myDecStations["advent" + n] = up["advent" + n];
     for (var cp2 in counts) {
@@ -737,7 +797,8 @@ function spinDecWheel() {
   var total = prize + bonus;
   var part = decRandomPart();
   var up = { lastSpin: today, spinStreak: newStreak };
-  up["parts/" + part] = (myDecParts[part] || 0) + 1;
+  // atomic increment so the part can never be lost to a rapid-tap overwrite
+  up["parts/" + part] = firebase.database.ServerValue.increment(1);
   db.ref("decStations/" + uid).update(up);
   myDecStations = myDecStations || {};
   myDecStations.lastSpin = today;
@@ -789,7 +850,8 @@ function claimDecGift() {
   if (myDecLastGift === today) { decMsg("you already claimed today's gift — come back tomorrow!"); renderDecGift(); return; }
   var part = decRandomPart();
   var up = { lastGift: today };
-  up["parts/" + part] = (myDecParts[part] || 0) + 1;
+  // atomic increment so the part can never be lost to a rapid-tap overwrite
+  up["parts/" + part] = firebase.database.ServerValue.increment(1);
   db.ref("decStations/" + uid).update(up);
   myDecStations = myDecStations || {};
   myDecStations.lastGift = today;
@@ -1017,6 +1079,15 @@ function decEnterAfterAccess(user, isF) {
     if (m) { m.textContent = "couldn't check beta access — check your connection and reload."; }
   });
 }
+/* ---------- pop-up menus: workshop, advent calendar, wheel ---------- */
+function decOpenModal(id) { var m = document.getElementById(id); if (m) { m.className = "dec-modal open"; } }
+function decCloseModal(id) { var m = document.getElementById(id); if (m) { m.className = "dec-modal"; } }
+document.getElementById("dec-open-workshop").onclick = function () { renderDecWorkshop(); renderDecPartsLine(); decOpenModal("dec-modal-workshop"); };
+document.getElementById("dec-close-workshop").onclick = function () { decCloseModal("dec-modal-workshop"); };
+document.getElementById("dec-open-advent").onclick = function () { renderDecAdvent(); decOpenModal("dec-modal-advent"); };
+document.getElementById("dec-close-advent").onclick = function () { decCloseModal("dec-modal-advent"); };
+document.getElementById("dec-open-wheel").onclick = function () { renderDecWheel(); decOpenModal("dec-modal-wheel"); };
+document.getElementById("dec-close-wheel").onclick = function () { decCloseModal("dec-modal-wheel"); };
 auth.onAuthStateChanged(function (user) {
   var authBox = document.getElementById("auth-box");
   var decBox = document.getElementById("dec-box");
