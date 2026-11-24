@@ -249,6 +249,13 @@ function decRecipeText(toy) {
   for (var p in toy.recipe) { if (toy.recipe.hasOwnProperty(p)) { parts.push(toy.recipe[p] + " " + p); } }
   return parts.join(" + ");
 }
+function decRecipeHaveText(toy) {
+  var parts = [];
+  for (var p in toy.recipe) {
+    if (toy.recipe.hasOwnProperty(p)) { parts.push(toy.recipe[p] + " " + p + " (have " + (myDecParts[p] || 0) + ")"); }
+  }
+  return parts.join(" + ");
+}
 function decHasParts(toy) {
   for (var p in toy.recipe) { if (toy.recipe.hasOwnProperty(p) && (myDecParts[p] || 0) < toy.recipe[p]) { return false; } }
   return true;
@@ -454,7 +461,7 @@ function renderDecWorkshop() {
       var ap = document.createElement("p");
       ap.textContent = "at the " + toy.station;
       var rp = document.createElement("p");
-      rp.textContent = "needs: " + decRecipeText(toy);
+      rp.textContent = "needs: " + decRecipeHaveText(toy);
       var hp = document.createElement("p");
       hp.textContent = "in your sleigh: " + (myDecToys[toy.key] || 0);
       var dp = document.createElement("p");
@@ -520,12 +527,17 @@ function renderDecPartsShop() {
   box.innerHTML = "";
   for (var i = 0; i < DEC_PARTS.length; i++) {
     (function (part) {
+      var row = document.createElement("div");
+      row.className = "dec-row";
+      var have = myDecParts[part] || 0;
+      row.textContent = part + " — you have " + have + " ";
       var btn = document.createElement("button");
       btn.className = "mini";
       btn.textContent = "buy 1 " + part + " — 50 candy canes";
       btn.disabled = (myDecCanes < 50);
       btn.onclick = function () { btn.disabled = true; buyDecPart(part); };
-      box.appendChild(btn);
+      row.appendChild(btn);
+      box.appendChild(row);
     })(DEC_PARTS[i]);
   }
 }
