@@ -11,31 +11,83 @@
   h2 { font-size: 22px; margin: 20px 0 8px 0; }
   p { margin: 0 0 16px 0; }
   a { color: #111111; }
+  .hidden { display: none; }
+  label { display: block; margin: 12px 0 4px 0; font-weight: bold; }
+  input { font-family: inherit; font-size: 15px; padding: 10px 10px; border: 3px solid #111111; width: 100%; box-sizing: border-box; margin: 4px 0 10px; }
+  button { font-family: inherit; font-size: 18px; padding: 10px 16px; background: #111111; color: #ffffff; border: 3px solid #111111; cursor: pointer; width: 100%; box-sizing: border-box; margin: 6px 0; }
+  button.secondary { background: #ffffff; color: #111111; }
   .feature { border: 3px solid #111111; background: #ffffff; padding: 14px; margin: 14px 0; }
   .feature h2 { margin: 0 0 6px; font-size: 22px; }
   .feature p { margin: 6px 0 10px; }
   a.btn { display: block; box-sizing: border-box; font-size: 18px; padding: 10px 16px; background: #111111; color: #ffffff; text-decoration: none; text-align: center; border: 3px solid #111111; margin: 6px 0; }
   .note { font-size: 15px; color: #555555; }
   .center { text-align: center; }
+  #auth-msg, #paywall-msg { font-size: 15px; min-height: 20px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Readium Beta</h1>
   <p>Try upcoming Readium features before they go live, and tell us what you think.</p>
+
+  <div id="auth-box" class="hidden">
+    <h2>sign in</h2>
+    <p>Use your Readium account — the same username and password you use on readium.ink.</p>
+    <label for="signin-username">Username</label>
+    <input id="signin-username" type="text" maxlength="20" autocomplete="username" placeholder="your username">
+    <label for="signin-pass">password</label>
+    <input id="signin-pass" type="password" autocomplete="current-password">
+    <button id="signin-btn">sign in</button>
+    <p id="auth-msg"></p>
+  </div>
+
+  <div id="paywall-box" class="hidden">
+    <h2>beta access is $2</h2>
+    <p>Beta is a paid feature. Pay <b>@readium</b> $2 on Venmo, put your username + "beta" in the payment note, then press "I paid!" below — Mia will confirm it in Venmo and your beta access will appear.</p>
+    <div id="paywall-claim" class="hidden">
+      <label for="paywall-user">your readium username</label>
+      <input id="paywall-user" type="text" maxlength="20" autocomplete="off">
+      <label for="paywall-venmo">name on the venmo payment (if different — e.g. a parent's name)</label>
+      <input id="paywall-venmo" type="text" maxlength="40" autocomplete="off" placeholder="same as above, or leave blank">
+      <p class="note">venmo note: <b><span id="paywall-note"></span></b></p>
+      <button id="paywall-paid-btn">I paid!</button>
+      <p id="paywall-msg"></p>
+    </div>
+    <p id="paywall-signin-note" class="note">sign in with your Readium account above first, then come back here to press "I paid!".</p>
+  </div>
+
   <div id="feature-list"></div>
   <p class="center"><a class="btn" href="feedback.html">leave feedback</a></p>
-  <p class="note">You need a Readium account to test features. Anyone with the link can leave feedback — no account needed.</p>
+  <p class="note">You need a Readium account and beta access ($2) to test features. Anyone with the link can leave feedback — no account needed.</p>
   <p class="center note"><a href="https://readium.ink">back to Readium</a></p>
 </div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
+var firebaseConfig = {
+    apiKey: "AIzaSyBM8k1SltnksCRZ5NvgggfQ952H3DZIyDY",
+    authDomain: "readium-33755.firebaseapp.com",
+    databaseURL: "https://readium-33755-default-rtdb.firebaseio.com",
+    projectId: "readium-33755",
+    storageBucket: "readium-33755.firebasestorage.app",
+    messagingSenderId: "1062133935488",
+    appId: "1:1062133935488:web:a00716635022a998f32565"
+  };
+firebase.initializeApp(firebaseConfig);
+var auth = firebase.auth();
+var db = firebase.database();
+var FOUNDERS = ["393cJa8SHXbuHTX4CTBf2yS4ePi1", "m9vGjZaNSVe1ofNotoUhuEx32BY2"];
+
 // To add a feature later, add one entry here (and the same entry in
 // feedback.html so it shows up in the feedback form's dropdown).
 var BETA_FEATURES = [
   { id: "pets", name: "Pets", desc: "Raise a pet: feed it, play with it, level it up.", page: "pet-test.html" }
 ];
-(function () {
+function renderFeatures() {
   var list = document.getElementById("feature-list");
+  list.innerHTML = "";
   if (!BETA_FEATURES.length) {
     list.innerHTML = "<p>No features being tested right now — check back soon!</p>";
     return;
@@ -58,7 +110,113 @@ var BETA_FEATURES = [
       list.appendChild(d);
     })(BETA_FEATURES[i]);
   }
-})();
+}
+
+/* Same sign-in as the real site: username + password. The account email
+   is just username@readium.chat under the hood — there is no real email. */
+function loginEmail(username) { return username + "@readium.chat"; }
+function validUsername(u) { return /^[a-z0-9._-]{3,20}$/.test(u); }
+function friendlyAuthError(err) {
+  var code = err && err.code ? err.code : "";
+  if (code === "auth/user-not-found" || code === "auth/invalid-credential") {
+    return "No account with that username. Try creating one on readium.ink instead.";
+  }
+  if (code === "auth/wrong-password") { return "Wrong password. Try again."; }
+  if (code === "auth/too-many-requests") { return "Too many tries. Wait a bit and try again."; }
+  return "Something went wrong: " + (err.message || code);
+}
+function usernameFromUser(user) {
+  if (!user) { return "signed in"; }
+  if (user.displayName) { return user.displayName; }
+  if (user.email) { return user.email.split("@")[0]; }
+  return "signed in";
+}
+document.getElementById("signin-btn").onclick = function () {
+  var un = document.getElementById("signin-username").value.replace(/^\s+|\s+$/g, "").toLowerCase();
+  var pw = document.getElementById("signin-pass").value;
+  var msg = document.getElementById("auth-msg");
+  msg.textContent = "";
+  if (!validUsername(un)) { msg.textContent = "enter your username (3-20 characters)."; return; }
+  if (!pw) { msg.textContent = "enter your password."; return; }
+  auth.signInWithEmailAndPassword(loginEmail(un), pw).catch(function (err) {
+    msg.textContent = friendlyAuthError(err);
+  });
+};
+
+/* ---------- beta paywall ($2, Venmo @readium) ----------
+   Beta is a paid feature. Founders bypass it. Anyone else needs
+   users/<uid>/betaAccess === true. "I paid!" writes a paymentClaims
+   claim (same as the main site) — Mia confirms the Venmo payment. */
+function renderPaywall(user) {
+  var claim = document.getElementById("paywall-claim");
+  var note = document.getElementById("paywall-signin-note");
+  var msg = document.getElementById("paywall-msg");
+  if (msg) { msg.textContent = ""; }
+  if (!user) {
+    if (claim) { claim.className = "hidden"; }
+    if (note) { note.className = "note"; }
+    return;
+  }
+  if (claim) { claim.className = ""; }
+  if (note) { note.className = "note hidden"; }
+  var un = document.getElementById("paywall-user");
+  if (un) { un.value = usernameFromUser(user); paywallUpdateNote(); }
+  var vn = document.getElementById("paywall-venmo");
+  if (vn) { vn.value = ""; }
+}
+function paywallUpdateNote() {
+  var un = String(document.getElementById("paywall-user").value || "").trim().toLowerCase();
+  document.getElementById("paywall-note").textContent = (un ? un : "your username") + " beta";
+}
+function paywallSubmitClaim() {
+  var user = auth.currentUser;
+  var msg = document.getElementById("paywall-msg");
+  if (!user || user.isAnonymous) { msg.textContent = "sign in with your Readium account first."; return; }
+  var un = String(document.getElementById("paywall-user").value || "").trim().toLowerCase();
+  var vn = String(document.getElementById("paywall-venmo").value || "").trim();
+  if (!validUsername(un)) { msg.textContent = "enter your readium username (3-20 characters)."; return; }
+  db.ref("paymentClaims").push({
+    uid: user.uid,
+    username: un,
+    venmoName: vn,
+    item: "beta",
+    amount: 2,
+    at: firebase.database.ServerValue.TIMESTAMP,
+    status: "pending"
+  }, function (err) {
+    if (err) { msg.textContent = "could not send that — try again. (" + (err.message || err) + ")"; return; }
+    msg.textContent = "sent! Mia will confirm your Venmo payment and your beta access will appear.";
+  });
+}
+document.getElementById("paywall-user").oninput = paywallUpdateNote;
+document.getElementById("paywall-paid-btn").onclick = paywallSubmitClaim;
+
+auth.onAuthStateChanged(function (user) {
+  var authBox = document.getElementById("auth-box");
+  var paywall = document.getElementById("paywall-box");
+  var feat = document.getElementById("feature-list");
+  if (!user || user.isAnonymous) {
+    authBox.className = "";
+    paywall.className = "";
+    feat.innerHTML = "";
+    renderPaywall(null);
+    return;
+  }
+  // signed in with a real account: beta is paid — check access first
+  var isF = FOUNDERS.indexOf(user.uid) !== -1;
+  db.ref("users/" + user.uid + "/betaAccess").once("value", function (snap) {
+    if (isF || snap.val() === true) {
+      authBox.className = "hidden";
+      paywall.className = "hidden";
+      renderFeatures();
+    } else {
+      authBox.className = "hidden";
+      feat.innerHTML = "";
+      paywall.className = "";
+      renderPaywall(user);
+    }
+  });
+});
 </script>
 </body>
 </html>

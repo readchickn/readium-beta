@@ -50,6 +50,21 @@
     <p id="auth-msg"></p>
   </div>
 
+  <div id="paywall-box" class="hidden">
+    <h2>beta access is $2</h2>
+    <p>Beta is a paid feature. Pay <b>@readium</b> $2 on Venmo, put your username + "beta" in the payment note, then press "I paid!" below — Mia will confirm it in Venmo and your beta access will appear.</p>
+    <div id="paywall-claim" class="hidden">
+      <label for="paywall-user">your readium username</label>
+      <input id="paywall-user" type="text" maxlength="20" autocomplete="off">
+      <label for="paywall-venmo">name on the venmo payment (if different — e.g. a parent's name)</label>
+      <input id="paywall-venmo" type="text" maxlength="40" autocomplete="off" placeholder="same as above, or leave blank">
+      <p class="note">venmo note: <b><span id="paywall-note"></span></b></p>
+      <button id="paywall-paid-btn">I paid!</button>
+      <p id="paywall-msg"></p>
+    </div>
+    <p id="paywall-signin-note" class="note">sign in with your Readium account above first, then come back here to press "I paid!".</p>
+  </div>
+
   <div id="pet-box" class="hidden">
     <p>signed in as <b><span id="pet-user"></span></b> <button id="pet-signout" class="secondary mini">sign out</button></p>
     <p>your xp: <b><span id="pet-xp">0</span></b></p>
@@ -67,6 +82,23 @@
         <button id="pet-feed-btn">feed (5 xp)</button>
         <button id="pet-play-btn">play (5 xp)</button>
       </p>
+      <p class="center">
+        <button id="pet-walk-btn">walk (5 xp)</button>
+        <button id="pet-fetch-btn">fetch (2 xp)</button>
+      </p>
+      <p id="pet-shinies" style="font-size:15px">shinies: 0</p>
+      <div id="pet-fetch-row" class="hidden">
+        <p style="font-size:15px">where did your pet hide the ball?</p>
+        <p class="center">
+          <button id="pet-fetch-bush" class="secondary mini">bush</button>
+          <button id="pet-fetch-box" class="secondary mini">box</button>
+          <button id="pet-fetch-pond" class="secondary mini">pond</button>
+        </p>
+      </div>
+      <div id="pet-tricks-wrap">
+        <p style="font-size:15px">tricks — tap one to teach it (10 xp) or see it:</p>
+        <p id="pet-tricks"></p>
+      </div>
       <p id="pet-msg"></p>
     </div>
     <div id="pet-picker-wrap">
@@ -92,6 +124,7 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 var auth = firebase.auth();
 var db = firebase.database();
+var FOUNDERS = ["393cJa8SHXbuHTX4CTBf2yS4ePi1", "m9vGjZaNSVe1ofNotoUhuEx32BY2"];
 
 var PET_ART = {
   cat: { idle: "data:image/png;base64,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", happy: "data:image/png;base64,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" },
@@ -154,10 +187,16 @@ function petCurrentStats(stored) {
     hours = Math.max(0, (Date.now() - st.updatedAt) / 3600000);
   }
   var drain = hours * rate;
+  var tricks = {};
+  if (st.tricks && typeof st.tricks === "object") {
+    for (var tk in st.tricks) { if (st.tricks[tk]) { tricks[tk] = true; } }
+  }
   return {
     hunger: Math.max(0, Math.min(100, (typeof st.hunger === "number" ? st.hunger : 100) - drain)),
     happiness: Math.max(0, Math.min(100, (typeof st.happiness === "number" ? st.happiness : 100) - drain)),
-    xp: xp, level: lvl
+    xp: xp, level: lvl,
+    tricks: tricks,
+    shinies: (typeof st.shinies === "number") ? st.shinies : 0
   };
 }
 function petStatsRef(pet) {
@@ -195,7 +234,10 @@ function petApplyCare(which, cost) {
       var st = petCurrentStats(cur || { hunger: 100, happiness: 100, xp: 0, updatedAt: now });
       if (which === "feed") { st.hunger = Math.min(100, st.hunger + 25); }
       else { st.happiness = Math.min(100, st.happiness + 25); }
-      return { hunger: st.hunger, happiness: st.happiness, xp: st.xp + 10, updatedAt: now };
+      var out = { hunger: st.hunger, happiness: st.happiness, xp: st.xp + 10, updatedAt: now };
+      if (st.tricks && Object.keys(st.tricks).length) { out.tricks = st.tricks; }
+      if (st.shinies) { out.shinies = st.shinies; }
+      return out;
     }, function (err, committed, snap) {
       if (err || !committed) { flashNotice("something went wrong, try again."); return; }
       var v = snap.val() || {};
@@ -206,6 +248,163 @@ function petApplyCare(which, cost) {
       renderPetScreen();
     });
   });
+}
+function betaGrantXp(n) {
+  // grant xp to yourself (walk finds, fetch wins) — mirrors the main
+  // site's changeXp; bumpXpDown with a positive n adds to the buckets.
+  var me = myUid();
+  if (!me || !n) { return; }
+  db.ref("xp/" + me).transaction(function (cur) {
+    var v = (cur && typeof cur.xp === "number") ? cur.xp : 0;
+    return { xp: Math.min(1000000, Math.max(0, v + n)) };
+  });
+  var now2 = new Date();
+  bumpXpDown("xpDaily/" + xpDayKey(now2) + "/" + me, n);
+  bumpXpDown("xpWeekly/" + xpWeekKey(now2) + "/" + me, n);
+  bumpXpDown("xpMonthly/" + xpMonthKey(now2) + "/" + me, n);
+}
+/* ---------- pet activities (2026-11-23): tricks, walk, fetch ----------
+   Same logic as the main Readium build. These work even when
+   hunger/happiness are full — they never touch the bars, only pet xp
+   (and shinies). Every transaction preserves tricks + shinies. */
+var PET_TRICKS = ["sit", "roll over", "high five", "spin", "play dead"];
+var PET_TRICK_COST = 10;
+var PET_TRICK_XP = 15;
+var PET_WALK_COST = 5;
+var PET_WALK_XP = 10;
+var PET_FETCH_COST = 2;
+var PET_FETCH_SPOTS = ["bush", "box", "pond"];
+var petFetchSpot = null; // where the ball is hidden this round (session only)
+function petStatsOut(st, xpGain) {
+  // build the petStats record to write, preserving tricks + shinies
+  var out = { hunger: st.hunger, happiness: st.happiness, xp: st.xp + xpGain, updatedAt: Date.now() };
+  if (st.tricks && Object.keys(st.tricks).length) { out.tricks = st.tricks; }
+  if (st.shinies) { out.shinies = st.shinies; }
+  return out;
+}
+function petAfterActivity(before, msg, showHappy) {
+  // shared tail: refresh stats, re-render, then show the message (+ happy frame)
+  var after = myPetStats ? petLevelFor(myPetStats.xp) : 1;
+  if (after > before) { flashNotice("your pet reached level " + after + "!"); }
+  else { flashNotice(msg); }
+  renderPetScreen();
+  if (showHappy && PET_ART[myPet]) {
+    document.getElementById("pet-img").src = PET_ART[myPet].happy;
+  }
+  document.getElementById("pet-msg").textContent = msg;
+}
+function petTeachTrick(trick) {
+  var me = myUid();
+  if (!me || !myPet) { return; }
+  var st0 = myPetStats || { tricks: {} };
+  if (st0.tricks && st0.tricks[trick]) { petDoTrick(trick); return; }
+  if (myXp < PET_TRICK_COST) { flashNotice("not enough xp! teaching a trick costs 10 xp."); return; }
+  var pet = myPet;
+  var before = petLevelFor(st0.xp || 0);
+  petDeductXp(PET_TRICK_COST, function (ok) {
+    if (!ok) { flashNotice("not enough xp!"); return; }
+    petStatsRef(pet).transaction(function (cur) {
+      var now = Date.now();
+      var st = petCurrentStats(cur || { hunger: 100, happiness: 100, xp: 0, updatedAt: now });
+      var tricks = {};
+      for (var k in st.tricks) { tricks[k] = true; }
+      tricks[trick] = true;
+      var out = petStatsOut(st, PET_TRICK_XP);
+      out.tricks = tricks;
+      return out;
+    }, function (err, committed, snap) {
+      if (err || !committed) { flashNotice("something went wrong, try again."); return; }
+      myPetStats = petCurrentStats(snap.val() || {});
+      petAfterActivity(before, "your " + (petNames[pet] || pet) + " learned " + trick + "!", true);
+    });
+  });
+}
+function petDoTrick(trick) {
+  // perform a learned trick: no cost, no xp — just for fun
+  if (!myPet || !PET_ART[myPet]) { return; }
+  document.getElementById("pet-img").src = PET_ART[myPet].happy;
+  document.getElementById("pet-msg").textContent = "your " + (petNames[myPet] || myPet) + " does " + trick + "!";
+}
+function petWalk() {
+  var me = myUid();
+  if (!me || !myPet) { return; }
+  if (myXp < PET_WALK_COST) { flashNotice("not enough xp! a walk costs 5 xp."); return; }
+  var pet = myPet;
+  var before = myPetStats ? petLevelFor(myPetStats.xp) : 1;
+  petDeductXp(PET_WALK_COST, function (ok) {
+    if (!ok) { flashNotice("not enough xp!"); return; }
+    var r = Math.random();
+    var foundXp = (r >= 0.4 && r < 0.8);
+    var foundShiny = (r >= 0.8);
+    petStatsRef(pet).transaction(function (cur) {
+      var now = Date.now();
+      var st = petCurrentStats(cur || { hunger: 100, happiness: 100, xp: 0, updatedAt: now });
+      var out = petStatsOut(st, PET_WALK_XP);
+      if (foundShiny) { out.shinies = (st.shinies || 0) + 1; }
+      return out;
+    }, function (err, committed, snap) {
+      if (err || !committed) { flashNotice("something went wrong, try again."); return; }
+      myPetStats = petCurrentStats(snap.val() || {});
+      var msg;
+      if (foundShiny) { msg = "your " + (petNames[pet] || pet) + " found a shiny on your walk!"; }
+      else if (foundXp) { betaGrantXp(5); msg = "your " + (petNames[pet] || pet) + " found 5 xp on your walk!"; }
+      else { msg = "you took your " + (petNames[pet] || pet) + " for a nice walk."; }
+      petAfterActivity(before, msg, true);
+    });
+  });
+}
+function petStartFetch() {
+  var me = myUid();
+  if (!me || !myPet) { return; }
+  if (petFetchSpot) { return; } // already playing
+  if (myXp < PET_FETCH_COST) { flashNotice("not enough xp! fetch costs 2 xp."); return; }
+  petDeductXp(PET_FETCH_COST, function (ok) {
+    if (!ok) { flashNotice("not enough xp!"); return; }
+    petFetchSpot = PET_FETCH_SPOTS[Math.floor(Math.random() * PET_FETCH_SPOTS.length)];
+    document.getElementById("pet-fetch-row").className = "";
+    document.getElementById("pet-msg").textContent = "your " + (petNames[myPet] || myPet) + " hid the ball — where is it?";
+  });
+}
+function petPickFetch(spot) {
+  if (!petFetchSpot || !myPet) { return; }
+  var me = myUid();
+  var pet = myPet;
+  var won = (spot === petFetchSpot);
+  petFetchSpot = null;
+  document.getElementById("pet-fetch-row").className = "hidden";
+  var before = myPetStats ? petLevelFor(myPetStats.xp) : 1;
+  var xpGain = won ? 10 : 5;
+  petStatsRef(pet).transaction(function (cur) {
+    var now = Date.now();
+    var st = petCurrentStats(cur || { hunger: 100, happiness: 100, xp: 0, updatedAt: now });
+    return petStatsOut(st, xpGain);
+  }, function (err, committed, snap) {
+    if (err || !committed) { flashNotice("something went wrong, try again."); return; }
+    myPetStats = petCurrentStats(snap.val() || {});
+    var msg;
+    if (won) {
+      betaGrantXp(5);
+      msg = "you found it! your " + (petNames[pet] || pet) + " is so happy! (+5 xp back)";
+    } else {
+      msg = "not there! your " + (petNames[pet] || pet) + " brings the ball back anyway.";
+    }
+    petAfterActivity(before, msg, won);
+  });
+}
+function renderPetTricks(st) {
+  var box = document.getElementById("pet-tricks");
+  if (!box) { return; }
+  box.innerHTML = "";
+  var learned = (st && st.tricks) ? st.tricks : {};
+  for (var i = 0; i < PET_TRICKS.length; i++) {
+    (function (trick) {
+      var b = document.createElement("button");
+      b.className = "secondary";
+      b.textContent = learned[trick] ? trick + " ✓" : trick + " (10 xp)";
+      b.onclick = function () { petTeachTrick(trick); };
+      box.appendChild(b);
+    })(PET_TRICKS[i]);
+  }
 }
 function petPick(key) {
   var me = myUid();
@@ -224,7 +423,7 @@ function petPick(key) {
       myPet = key;
       if (!myPetStatsAll) { myPetStatsAll = {}; }
       myPetStatsAll[key] = { hunger: 100, happiness: 100, xp: 0, updatedAt: now };
-      myPetStats = { hunger: 100, happiness: 100, xp: 0, level: 1 };
+      myPetStats = { hunger: 100, happiness: 100, xp: 0, level: 1, tricks: {}, shinies: 0 };
       flashNotice(firstPick ? "you got a " + (petNames[key] || key) + "!" : "your pet is now a " + (petNames[key] || key) + "!");
       refreshHome();
       renderPetScreen();
@@ -272,7 +471,7 @@ function renderPetScreen() {
     return;
   }
   main.className = "";
-  var st = myPetStats || { hunger: 100, happiness: 100, xp: 0, level: 1 };
+  var st = myPetStats || { hunger: 100, happiness: 100, xp: 0, level: 1, tricks: {}, shinies: 0 };
   var img = document.getElementById("pet-img");
   img.src = (st.happiness >= 50) ? PET_ART[myPet].happy : PET_ART[myPet].idle;
   img.alt = petNames[myPet] || myPet;
@@ -287,7 +486,12 @@ function renderPetScreen() {
   var pb = document.getElementById("pet-play-btn");
   fb.disabled = st.hunger >= 100;
   pb.disabled = st.happiness >= 100;
+  var sh = document.getElementById("pet-shinies");
+  if (sh) { sh.textContent = "shinies: " + (st.shinies || 0); }
   document.getElementById("pet-msg").textContent = "";
+  var fr = document.getElementById("pet-fetch-row");
+  if (fr) { fr.className = petFetchSpot ? "" : "hidden"; }
+  renderPetTricks(st);
   renderPetPicker();
 }
 function loadPet() {
@@ -325,9 +529,62 @@ function watchMyXp() {
   });
 }
 
+/* ---------- beta paywall ($2, Venmo @readium) ----------
+   Beta is a paid feature. Founders bypass it. Anyone else needs
+   users/<uid>/betaAccess === true. "I paid!" writes a paymentClaims
+   claim (same as the main site) — Mia confirms the Venmo payment. */
+function renderPaywall(user) {
+  var claim = document.getElementById("paywall-claim");
+  var note = document.getElementById("paywall-signin-note");
+  var msg = document.getElementById("paywall-msg");
+  if (msg) { msg.textContent = ""; }
+  if (!user) {
+    if (claim) { claim.className = "hidden"; }
+    if (note) { note.className = "note"; }
+    return;
+  }
+  if (claim) { claim.className = ""; }
+  if (note) { note.className = "note hidden"; }
+  var un = document.getElementById("paywall-user");
+  if (un) { un.value = usernameFromUser(user); paywallUpdateNote(); }
+  var vn = document.getElementById("paywall-venmo");
+  if (vn) { vn.value = ""; }
+}
+function paywallUpdateNote() {
+  var un = String(document.getElementById("paywall-user").value || "").trim().toLowerCase();
+  document.getElementById("paywall-note").textContent = (un ? un : "your username") + " beta";
+}
+function paywallSubmitClaim() {
+  var user = auth.currentUser;
+  var msg = document.getElementById("paywall-msg");
+  if (!user || user.isAnonymous) { msg.textContent = "sign in with your Readium account first."; return; }
+  var un = String(document.getElementById("paywall-user").value || "").trim().toLowerCase();
+  var vn = String(document.getElementById("paywall-venmo").value || "").trim();
+  if (!validUsername(un)) { msg.textContent = "enter your readium username (3-20 characters)."; return; }
+  db.ref("paymentClaims").push({
+    uid: user.uid,
+    username: un,
+    venmoName: vn,
+    item: "beta",
+    amount: 2,
+    at: firebase.database.ServerValue.TIMESTAMP,
+    status: "pending"
+  }, function (err) {
+    if (err) { msg.textContent = "could not send that — try again. (" + (err.message || err) + ")"; return; }
+    msg.textContent = "sent! Mia will confirm your Venmo payment and your beta access will appear.";
+  });
+}
+
 /* ---------- auth + wiring ---------- */
 document.getElementById("pet-feed-btn").onclick = function () { petApplyCare("feed", PET_FEED_COST); };
 document.getElementById("pet-play-btn").onclick = function () { petApplyCare("play", PET_PLAY_COST); };
+document.getElementById("pet-walk-btn").onclick = petWalk;
+document.getElementById("pet-fetch-btn").onclick = petStartFetch;
+document.getElementById("pet-fetch-bush").onclick = function () { petPickFetch("bush"); };
+document.getElementById("pet-fetch-box").onclick = function () { petPickFetch("box"); };
+document.getElementById("pet-fetch-pond").onclick = function () { petPickFetch("pond"); };
+document.getElementById("paywall-user").oninput = paywallUpdateNote;
+document.getElementById("paywall-paid-btn").onclick = paywallSubmitClaim;
 document.getElementById("pet-signout").onclick = function () { auth.signOut(); };
 /* Same sign-in as the real site: username + password. The account email
    is just username@readium.chat under the hood — there is no real email. */
@@ -362,9 +619,12 @@ document.getElementById("signin-btn").onclick = function () {
 auth.onAuthStateChanged(function (user) {
   var authBox = document.getElementById("auth-box");
   var petBox = document.getElementById("pet-box");
+  var paywall = document.getElementById("paywall-box");
   if (!user || user.isAnonymous) {
     authBox.className = "";
     petBox.className = "hidden";
+    paywall.className = "";
+    renderPaywall(null);
     myPet = null; myXp = 0; myPetStats = null; myPetStatsAll = null;
     if (xpRef) { xpRef.off(); xpRef = null; }
     if (user && user.isAnonymous) {
@@ -372,13 +632,25 @@ auth.onAuthStateChanged(function (user) {
     }
     return;
   }
-  authBox.className = "hidden";
-  petBox.className = "";
-  document.getElementById("pet-user").textContent = usernameFromUser(user);
-  watchMyXp();
-  db.ref("users/" + user.uid + "/pet").once("value", function (snap) {
-    myPet = snap.val() || null;
-    loadPet();
+  // signed in with a real account: beta is paid — check access first
+  var isF = FOUNDERS.indexOf(user.uid) !== -1;
+  db.ref("users/" + user.uid + "/betaAccess").once("value", function (snap) {
+    if (isF || snap.val() === true) {
+      authBox.className = "hidden";
+      paywall.className = "hidden";
+      petBox.className = "";
+      document.getElementById("pet-user").textContent = usernameFromUser(user);
+      watchMyXp();
+      db.ref("users/" + user.uid + "/pet").once("value", function (snap2) {
+        myPet = snap2.val() || null;
+        loadPet();
+      });
+    } else {
+      authBox.className = "hidden";
+      petBox.className = "hidden";
+      paywall.className = "";
+      renderPaywall(user);
+    }
   });
 });
 </script>
