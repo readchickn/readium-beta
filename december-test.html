@@ -214,6 +214,7 @@ var DEC_WHEEL_PRIZES = [50, 100, 100, 200, 200, 300, 500, 1000];
 
 var myDecTeam = null;
 var myDecCanes = 0;
+var decCandyRef = null;
 var myDecStations = {};
 var myDecParts = { wood: 0, fabric: 0, paint: 0, wheels: 0 };
 var myDecToys = { teddy: 0, train: 0, doll: 0, blocks: 0, robot: 0 };
@@ -336,6 +337,18 @@ function enterDec() {
     joinText.textContent = "you need an account to play — sign in from home first!";
     return;
   }
+  /* persistent balance listener: RTDB transactions evaluate the update
+     function against the LOCAL cache first, so without this the parts-shop
+     buy transaction always sees null (0) and aborts before the server is
+     ever consulted — every part buy fails as "not enough candy canes". */
+  if (decCandyRef) { decCandyRef.off("value"); }
+  decCandyRef = db.ref("decCandy/" + uid);
+  decCandyRef.on("value", function (s) {
+    myDecCanes = (typeof s.val() === "number") ? s.val() : 0;
+    var cl = document.getElementById("dec-candy-line");
+    if (cl) { cl.textContent = myDecCanes; }
+    renderDecPartsShop();
+  });
   joinBtn.className = "";
   joinText.textContent = "santa's workshop needs toy makers! tap below to get sorted onto a team.";
   document.getElementById("dec-result").textContent = "";
@@ -1169,6 +1182,7 @@ auth.onAuthStateChanged(function (user) {
     paywall.className = "";
     renderPaywall(null);
     stopDecCountdown();
+    if (decCandyRef) { decCandyRef.off("value"); decCandyRef = null; }
     myDecTeam = null; myDecCanes = 0; myDecStations = {};
     myDecParts = { wood: 0, fabric: 0, paint: 0, wheels: 0 };
     myDecToys = { teddy: 0, train: 0, doll: 0, blocks: 0, robot: 0 };
