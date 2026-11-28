@@ -428,7 +428,7 @@ document.getElementById("dec-join-btn").onclick = function () {
     if (err) { decMsg("couldn't join a team. try again."); return; }
     myDecTeam = team;
     showDecMain();
-    decMsg("you're on team " + DEC_TEAM_NAMES[team] + "!");
+    decMsg("you're on " + DEC_TEAM_NAMES[team] + "!");
   });
 };
 function showDecMain() {
@@ -452,7 +452,7 @@ function renderDecTeamLine() {
   im.alt = DEC_TEAM_NAMES[myDecTeam];
   el.appendChild(im);
   var sp = document.createElement("span");
-  sp.textContent = "team " + DEC_TEAM_NAMES[myDecTeam];
+  sp.textContent = DEC_TEAM_NAMES[myDecTeam];
   el.appendChild(sp);
 }
 
@@ -978,7 +978,7 @@ function loadDecBoard() {
           var im = document.createElement("img");
           im.src = DEC_ART.teams[r.team]; im.alt = DEC_TEAM_NAMES[r.team];
           var nm = document.createElement("span");
-          nm.textContent = "team " + DEC_TEAM_NAMES[r.team] + " — " + r.canes + " candy canes";
+          nm.textContent = DEC_TEAM_NAMES[r.team] + " — " + r.canes + " candy canes";
           row.appendChild(rk); row.appendChild(im); row.appendChild(nm);
           list.appendChild(row);
         })(rows[j], j);
